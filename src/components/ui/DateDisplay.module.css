@@ -1,0 +1,154 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
+
+.container {
+    position: relative;
+    width: 240px;
+    height: 140px;
+    font-family: 'Anton', 'Impact', sans-serif;
+    transform: rotate(-3deg);
+    z-index: 50;
+    margin-top: 20px;
+    margin-left: 10px;
+    /* Overall drop shadow for depth */
+    filter: drop-shadow(4px 4px 0px rgba(0, 0, 0, 0.3));
+}
+
+/* 1. Date Numbers Row */
+.dateRow {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: flex-end;
+    /* Align bottom for overlap effect */
+    line-height: 0.8;
+    padding-left: 10px;
+}
+
+.month {
+    font-size: 60px;
+    color: #fff;
+    /* Heavy Black Outline P5 Style */
+    -webkit-text-stroke: 2px #000;
+    text-shadow: 4px 4px 0 #000;
+    transform: rotate(-5deg);
+    z-index: 2;
+    position: relative;
+}
+
+.slash {
+    font-size: 90px;
+    color: #2d2d2d;
+    /* Dark Grey/Black Slash */
+    -webkit-text-stroke: 1px #fff;
+    transform: rotate(10deg) translateX(-10px) translateY(5px);
+    z-index: 1;
+}
+
+.day {
+    font-size: 80px;
+    color: #fff;
+    -webkit-text-stroke: 2px #000;
+    text-shadow: 4px 4px 0 #000;
+    transform: rotate(-3deg) translateX(-15px);
+    z-index: 3;
+}
+
+/* 2. Info Row (Day + Weather) */
+.infoRow {
+    display: flex;
+    align-items: center;
+    position: relative;
+    z-index: 20;
+    margin-top: -25px;
+    /* Heavy overlap */
+    margin-left: 20px;
+}
+
+.dayOfWeekBg {
+    background: #000;
+    color: #fff;
+    padding: 4px 20px 6px 40px;
+    /* Space for the day overlap */
+    transform: skewX(-15deg) rotate(-2deg);
+    /* Jagged P5 Shape */
+    clip-path: polygon(10% 0%, 100% 0%, 95% 100%, 0% 100%);
+    border: 2px solid #fff;
+    position: relative;
+    z-index: 5;
+}
+
+.dayOfWeekText {
+    display: block;
+    font-size: 28px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    transform: skewX(15deg);
+    /* Counter-skew */
+}
+
+/* 3. Weather Icon - Attached Stamp style */
+.weatherIcon {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    /* Force minimum width */
+    min-height: 48px;
+    /* Force minimum height */
+    flex-shrink: 0;
+    /* CRITICAL: Prevent oval squishing */
+    background: #fff;
+    border: 3px solid #000;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: -15px;
+    /* Overlap/Attach */
+    z-index: 21;
+    transform: rotate(5deg);
+    box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+}
+
+.weatherIcon svg {
+    width: 32px;
+    height: 32px;
+}
+
+/* 4. Background Shapes */
+.decorationRed {
+    position: absolute;
+    top: 0;
+    left: -20px;
+    width: 250px;
+    height: 120px;
+    background: #d4141d;
+    z-index: 0;
+    /* Dynamic Background Shape from reference */
+    clip-path: polygon(15% 0%, 100% 10%, 90% 90%, 0% 80%);
+    transform: rotate(-5deg);
+    pointer-events: none;
+}
+
+.decorationRed::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: radial-gradient(rgba(0, 0, 0, 0.2) 2px, transparent 2px);
+    background-size: 10px 10px;
+}
+
+.decorationBlack {
+    position: absolute;
+    top: 40px;
+    right: -20px;
+    width: 100px;
+    height: 100px;
+    background: #000;
+    z-index: -1;
+    clip-path: polygon(20% 0%, 100% 20%, 80% 100%, 0% 80%);
+    transform: rotate(10deg);
+    opacity: 0.3;
+}
