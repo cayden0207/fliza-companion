@@ -6,6 +6,7 @@ import Scene3D from '@/components/3d/Scene3D';
 import FloatingMenu from '@/components/ui/FloatingMenu';
 import PhoneInterface from '@/components/ui/PhoneInterface';
 import DateDisplay from '@/components/ui/DateDisplay';
+import CameraView from '@/components/ui/CameraView';
 import styles from './page.module.css';
 
 import ProfileCard from '@/components/ui/ProfileCard';
@@ -15,6 +16,7 @@ export default function Home() {
   const [vrm, setVrm] = useState<VRM | null>(null);
   const [isPhoneOpen, setIsPhoneOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
@@ -36,6 +38,12 @@ export default function Home() {
     console.log('VRM loaded successfully!');
   }, []);
 
+  // Handle vision analysis (optional: show in chat or notification)
+  const handleVisionAnalysis = useCallback((analysis: string) => {
+    console.log('Fliza Vision:', analysis);
+    // Could add to chat or show as floating notification
+  }, []);
+
   return (
     <div className={styles.container}>
       {/* 3D Scene - Always visible */}
@@ -43,6 +51,13 @@ export default function Home() {
 
       {/* Background Music */}
       <audio src="/bgm.mp3" loop autoPlay />
+
+      {/* Camera View - Floating when active */}
+      <CameraView
+        isEnabled={isCameraActive}
+        onToggle={() => setIsCameraActive(!isCameraActive)}
+        onAnalysis={handleVisionAnalysis}
+      />
 
       {/* UI Layer */}
       <div className={styles.uiLayer}>
@@ -52,6 +67,8 @@ export default function Home() {
           <FloatingMenu
             onChatToggle={() => setIsPhoneOpen(!isPhoneOpen)}
             onProfileToggle={() => setIsProfileOpen(true)}
+            onCameraToggle={() => setIsCameraActive(!isCameraActive)}
+            isCameraActive={isCameraActive}
           />
         </header>
 
@@ -71,3 +88,4 @@ export default function Home() {
     </div>
   );
 }
+

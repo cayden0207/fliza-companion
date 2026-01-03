@@ -1,0 +1,201 @@
+.container {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 280px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+    border: 3px solid #ff2d55;
+    border-radius: 12px;
+    overflow: hidden;
+    z-index: 1000;
+    box-shadow:
+        0 0 20px rgba(255, 45, 85, 0.3),
+        0 10px 40px rgba(0, 0, 0, 0.5);
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px) scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background: linear-gradient(90deg, #ff2d55, #cc0033);
+    gap: 8px;
+}
+
+.recordingDot {
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border-radius: 50%;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        box-shadow: 0 0 10px #fff;
+    }
+
+    50% {
+        opacity: 0.5;
+        box-shadow: 0 0 5px #fff;
+    }
+}
+
+.title {
+    flex: 1;
+    font-family: 'Bebas Neue', Impact, sans-serif;
+    font-size: 14px;
+    color: white;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+.closeBtn {
+    width: 24px;
+    height: 24px;
+    background: rgba(0, 0, 0, 0.3);
+    border: none;
+    border-radius: 4px;
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.closeBtn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.videoWrapper {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: #000;
+}
+
+.video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    /* Mirror effect */
+}
+
+.scanOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.scanLine {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg,
+            transparent,
+            rgba(255, 45, 85, 0.8),
+            rgba(255, 255, 255, 0.9),
+            rgba(255, 45, 85, 0.8),
+            transparent);
+    box-shadow: 0 0 20px rgba(255, 45, 85, 0.8);
+    animation: scan 1.5s linear infinite;
+}
+
+@keyframes scan {
+    0% {
+        top: 0;
+    }
+
+    100% {
+        top: 100%;
+    }
+}
+
+.countdown {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid #ff2d55;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Bebas Neue', Impact, sans-serif;
+    font-size: 16px;
+    color: white;
+}
+
+.analysisBox {
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.8);
+    border-top: 1px solid rgba(255, 45, 85, 0.3);
+}
+
+.analysisText {
+    display: block;
+    font-size: 13px;
+    color: #fff;
+    line-height: 1.4;
+    font-style: italic;
+}
+
+.error {
+    padding: 10px;
+    background: rgba(255, 0, 0, 0.2);
+    color: #ff6b6b;
+    font-size: 12px;
+    text-align: center;
+}
+
+/* Scanline overlay effect */
+.videoWrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(0deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 0, 0, 0.1) 2px,
+            rgba(0, 0, 0, 0.1) 4px);
+    pointer-events: none;
+}
+
+/* Corner decorations */
+.videoWrapper::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    border: 1px solid rgba(255, 45, 85, 0.3);
+    pointer-events: none;
+    z-index: 1;
+}

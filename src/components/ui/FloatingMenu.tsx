@@ -9,9 +9,11 @@ import { User } from '@supabase/supabase-js';
 interface FloatingMenuProps {
     onChatToggle?: () => void;
     onProfileToggle?: () => void;
+    onCameraToggle?: () => void;
+    isCameraActive?: boolean;
 }
 
-export default function FloatingMenu({ onChatToggle, onProfileToggle }: FloatingMenuProps) {
+export default function FloatingMenu({ onChatToggle, onProfileToggle, onCameraToggle, isCameraActive }: FloatingMenuProps) {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [showLoginModal, setShowLoginModal] = useState(false);
 
@@ -44,7 +46,12 @@ export default function FloatingMenu({ onChatToggle, onProfileToggle }: Floating
 
     const menuItems = [
         { icon: '📱', label: 'Chat', color: 'blue', isTrigger: true, onClick: onChatToggle },
-        { icon: '🎁', label: 'Gift', color: 'pink' },
+        {
+            icon: isCameraActive ? '🔴' : '👁️',
+            label: isCameraActive ? 'Vision ON' : 'Vision',
+            color: isCameraActive ? 'red' : 'purple',
+            onClick: onCameraToggle
+        },
         { icon: '📖', label: 'Story', color: 'blue' },
         { icon: '🏆', label: 'Feats', color: 'gold' },
         {
