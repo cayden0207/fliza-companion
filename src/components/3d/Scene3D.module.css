@@ -43,47 +43,93 @@
     border: 4px solid rgba(124, 159, 255, 0.2);
     border-top-color: transparent;
     border-radius: 50%;
-    animation: spin 1s linear infinite;
-    background: conic-gradient(from 0deg, transparent, #7c9fff, #ff8fab, #b8f3ff, transparent);
-    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 0);
-    mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 0);
+    transform: rotate(-3deg);
 }
 
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
+/* Top Hat Icon (CSS Shapes) */
+.topHat {
+    width: 80px;
+    height: 60px;
+    background: #fff;
+    position: relative;
+    border: 4px solid #d4141d;
+    margin-bottom: 20px;
+    clip-path: polygon(10% 0, 90% 0, 80% 100%, 20% 100%);
+    animation: floatHat 2s ease-in-out infinite;
+}
+
+.topHat::after {
+    content: '';
+    position: absolute;
+    bottom: -15px;
+    left: -20px;
+    width: 120px;
+    height: 15px;
+    background: #fff;
+    border: 4px solid #d4141d;
+    transform: rotate(2deg);
+}
+
+@keyframes floatHat {
+
+    0%,
+    100% {
+        transform: translateY(0) rotate(0deg);
+    }
+
+    50% {
+        transform: translateY(-10px) rotate(5deg);
     }
 }
 
-/* Progress bar */
+.loadingText {
+    font-family: 'Impact', 'Anton', sans-serif;
+    font-size: 48px;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    text-shadow:
+        4px 4px 0 #d4141d,
+        -1px -1px 0 #d4141d;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.subText {
+    font-family: monospace;
+    font-size: 16px;
+    color: #d4141d;
+    background: #000;
+    padding: 4px 12px;
+    border: 1px solid #d4141d;
+    transform: skewX(-15deg);
+}
+
 .progressBar {
-    width: 200px;
-    height: 10px;
-    background: rgba(124, 159, 255, 0.15);
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+    width: 300px;
+    height: 24px;
+    background: #000;
+    border: 3px solid #fff;
+    position: relative;
+    box-shadow: 4px 4px 0 #d4141d;
+    transform: skewX(-10deg);
+    padding: 2px;
 }
 
 .progressFill {
     height: 100%;
-    background: linear-gradient(90deg, #7c9fff 0%, #ff8fab 50%, #b8f3ff 100%);
-    background-size: 200% 100%;
-    border-radius: 10px;
-    transition: width 0.3s ease;
-    animation: progressShimmer 2s ease-in-out infinite;
-    position: relative;
-}
-
-.progressFill::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 4px;
-    right: 4px;
-    height: 4px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, transparent 100%);
-    border-radius: 4px;
+    background: #d4141d;
+    transition: width 0.1s linear;
+    /* Striped fill */
+    background-image: linear-gradient(45deg,
+            rgba(0, 0, 0, 0.15) 25%,
+            transparent 25%,
+            transparent 50%,
+            rgba(0, 0, 0, 0.15) 50%,
+            rgba(0, 0, 0, 0.15) 75%,
+            transparent 75%,
+            transparent);
+    background-size: 20px 20px;
 }
 
 @keyframes progressShimmer {

@@ -2,61 +2,37 @@
 
 import { useState, useRef, useEffect } from 'react';
 import styles from './PhoneInterface.module.css';
+import { useChatHistory } from '@/hooks/useChatHistory';
 
 interface PhoneInterfaceProps {
     isOpen: boolean;
     onClose: () => void;
-    isLoggedIn: boolean;
-    onLoginRequired: () => void;
-}
-
-interface Message {
-    id: string;
-    text: string;
-    sender: 'user' | 'ai';
-    timestamp: number;
+    isLoggedIn?: boolean; // Optional now, hook handles user check
+    onLoginRequired?: () => void;
 }
 
 export default function PhoneInterface({
     isOpen,
     onClose,
-    isLoggedIn,
-    onLoginRequired
 }: PhoneInterfaceProps) {
-    const [messages, setMessages] = useState<Message[]>([
-        { id: '1', text: "Hey! I'm Fliza. What's on your mind? ✨", sender: 'ai', timestamp: Date.now() }
-    ]);
-    const [inputValue, setInputValue] = useState('');
+    const { messages, sendMessage, user, loading } = useChatHistory();
+    const [inputValue, setInputValue] = useState(''); // Keep local input state
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (isOpen) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
     }, [messages, isOpen]);
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (!inputValue.trim()) return;
 
-        // Optimistic add
-        const newMsg: Message = {
-            id: Date.now().toString(),
-            text: inputValue,
-            sender: 'user',
-            timestamp: Date.now()
-        };
-        setMessages(prev => [...prev, newMsg]);
-        setInputValue('');
+        const content = inputValue;
+        setInputValue(''); // Clear immediately for UX
 
-        // Simulate AI typing/reply
-        setTimeout(() => {
-            const reply: Message = {
-                id: (Date.now() + 1).toString(),
-                text: "That sounds interesting! Tell me more based on the game world context.",
-                sender: 'ai',
-                timestamp: Date.now()
-            };
-            setMessages(prev => [...prev, reply]);
-        }, 1000);
+        await sendMessage(content, 'user');
     };
 
     if (!isOpen) return null;
@@ -75,31 +51,56 @@ export default function PhoneInterface({
 
                 {/* Chat Area */}
                 <div className={styles.chatArea}>
-                    <div className={styles.messagesList}>
-                        {messages.map((msg) => (
-                            <div
-                                key={msg.id}
-                                className={`${styles.messageRow} ${msg.sender === 'user' ? styles.rowUser : styles.rowAi}`}
-                            >
-                                {msg.sender === 'ai' && (
-                                    <div className={styles.chatAvatar}>
-                                        {/* Placeholder for avatar image if we had one, or just emoji */}
-                                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>🐰</div>
-                                    </div>
-                                )}
+                    {!user ? (
+                        <div className={styles.emptyState}>
+                            <p style={{ color: '#fff', textAlign: 'center', marginTop: '50px', fontFamily: 'Anton' }}>
+                                PLEASE LOGIN TO CHAT
+                            </p>
+                        </div>
+                    ) : (
+                        <div className={styles.messagesList}>
+                            {messages.map((msg) => (
+                                <div
+                                    key={msg.id}
+                                    className={`${styles.messageRow} ${msg.role === 'user' ? styles.rowUser : styles.rowAi}`}
+                                >
+                                    {msg.role === 'assistant' && (
+                                        <div className={styles.chatAvatar}>
+                                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>🐰</div>
+                                        </div>
+                                    )}
 
-                                <div className={styles.bubbleWrapper}>
-                                    <div className={`${styles.bubble} ${msg.sender === 'user' ? styles.userBubble : styles.aiBubble}`}>
-                                        {msg.text}
-                                    </div>
-                                    <div className={styles.timestamp}>
-                                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    <div className={styles.bubbleWrapper}>
+                                        <div className={`${styles.bubble} ${msg.role === 'user' ? styles.userBubble : styles.aiBubble}`}>
+                                            {msg.content}
+                                        </div>
+                                        <div className={styles.timestamp}>
+                                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
-                        <div ref={messagesEndRef} />
-                    </div>
+                            ))}
+                            <div ref={messagesEndRef} />
+
+                            {/* Typing Indicator */}
+                            {loading && (
+                                <div className={`${styles.messageRow} ${styles.rowAi}`}>
+                                    <div className={styles.chatAvatar}>
+                                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>🐰</div>
+                                    </div>
+                                    <div className={styles.bubbleWrapper}>
+                                        <div className={`${styles.bubble} ${styles.aiBubble}`}>
+                                            <div className={styles.typingIndicator}>
+                                                <div className={styles.typingDot} />
+                                                <div className={styles.typingDot} />
+                                                <div className={styles.typingDot} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Input Area */}
@@ -108,12 +109,13 @@ export default function PhoneInterface({
                         <input
                             type="text"
                             className={styles.inputField}
-                            placeholder="Type a message..."
+                            placeholder={user ? "Type a message..." : "Login to chat..."}
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                            disabled={!user}
                         />
-                        <button className={styles.sendBtn} onClick={handleSend}>
+                        <button className={styles.sendBtn} onClick={handleSend} disabled={!user}>
                             SEND
                         </button>
                     </div>
