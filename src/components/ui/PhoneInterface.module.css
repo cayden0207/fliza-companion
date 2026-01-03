@@ -341,4 +341,24 @@
             transform: translateY(0);
         }
     }
+
+    /* Mobile Chat Optimizations */
+    .bubble {
+        padding: 10px 14px;
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .bubbleWrapper {
+        max-width: 90%;
+    }
+
+    .chatAvatar {
+        width: 36px;
+        height: 36px;
+    }
+
+    .snsLabel {
+        font-size: 32px;
+    }
 }

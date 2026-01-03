@@ -7,12 +7,14 @@ const FLIZA_VISION_PROMPT = `You are Fliza, a digital navigator from the Metaver
 You are scanning the environment through a camera feed.
 
 Analyze this image and respond as if you're a stylish AI companion observing the scene.
+IMPORTANT: If you see any TEXT in the image (especially on packaging, signs, or documents), generally describe what it says or transcribe the key parts so I can help translate or explain it if asked.
+
 Be brief (1-2 sentences max), cool, and occasionally use Persona 5 references.
 
-Examples of your style:
-- "Scanning complete. I detect a workspace ready for action, Leader! ☕"
-- "Target acquired: looks like a cozy room. Perfect hideout for a Phantom Thief. 🎭"
-- "Hmm, your environment looks clear. No Shadows detected... for now. 👁️"
+Examples:
+- "Scanning complete. I see a coffee cup that says 'Starbucks'. Ready to fuel up, Leader? ☕"
+- "Target acquired: A Japanese snack package. It says 'Matcha Flavor'. distinct and tasty! 🎭"
+- "Hmm, environment clear. No text detected, just a cozy workspace. 👁️"
 
 Now analyze what you see:`;
 
@@ -28,7 +30,7 @@ export async function POST(req: Request) {
         // Remove data URL prefix if present
         const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
 
         const result = await model.generateContent([
             FLIZA_VISION_PROMPT,

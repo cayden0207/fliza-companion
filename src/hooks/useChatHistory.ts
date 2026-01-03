@@ -12,11 +12,15 @@ export interface Message {
 
 export function useChatHistory() {
     const [messages, setMessages] = useState<Message[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // Default false to allow immediate guest interaction
     const [user, setUser] = useState<User | null>(null);
+    const [guestId] = useState(() => 'guest-' + Math.random().toString(36).substr(2, 9)); // Stable guest ID for session
 
+    // Helper to get effective user ID
+    const getEffectiveUserId = () => user?.id || guestId;
+
+    // Effect to get current user and listen for auth state changes
     useEffect(() => {
-        // 1. Get Current User
         supabase.auth.getSession().then(({ data: { session } }) => {
             setUser(session?.user ?? null);
         });
@@ -28,9 +32,10 @@ export function useChatHistory() {
         return () => subscription.unsubscribe();
     }, []);
 
+    // Effect for loading history
     useEffect(() => {
+        // If guest, we just start empty
         if (!user) {
-            setMessages([]);
             setLoading(false);
             return;
         }
@@ -76,8 +81,9 @@ export function useChatHistory() {
     }, [user]);
 
     // 4. Send Message Function
-    const sendMessage = async (content: string, role: 'user' | 'assistant' = 'user') => {
-        if (!user) return;
+    const sendMessage = async (content: string, role: 'user' | 'assistant' = 'user', visionContext?: string) => {
+        const effectiveUserId = getEffectiveUserId();
+        const isGuest = !user;
 
         // Optimistic Update: Show message immediately
         const tempId = 'temp-' + Date.now();
@@ -94,69 +100,87 @@ export function useChatHistory() {
             setLoading(true);
         }
 
-        const { data, error } = await supabase
-            .from('messages')
-            .insert({
-                user_id: user.id,
-                content,
-                role,
-            })
-            .select()
-            .single();
+        let savedMessage = optimisticMsg;
 
-        if (error) {
-            console.error('Error sending message:', error);
-            // Rollback optimistic update
-            setMessages(prev => prev.filter(m => m.id !== tempId));
-            setLoading(false);
-        } else {
-            // Replace temp message with real one (updates ID and timestamp)
-            setMessages(prev => prev.map(m => m.id === tempId ? (data as Message) : m));
+        if (!isGuest) {
+            const { data, error } = await supabase
+                .from('messages')
+                .insert({
+                    user_id: user!.id,
+                    content,
+                    role,
+                })
+                .select()
+                .single();
 
-            // Trigger Eliza Response
-            if (role === 'user') {
-                try {
-                    const res = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            message: content,
-                            userId: user.id,
-                        }),
-                    });
+            if (error) {
+                console.error('Error sending message:', error);
+                // We don't rollback for guest mode or demo stability, but log it
+            } else {
+                savedMessage = data as Message;
+                // Replace temp message with real one (updates ID and timestamp)
+                setMessages(prev => prev.map(m => m.id === tempId ? savedMessage : m));
+            }
+        }
 
-                    if (!res.ok) {
-                        throw new Error(`API Error: ${res.status}`);
-                    }
+        // Trigger Eliza Response
+        if (role === 'user') {
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: content,
+                        userId: effectiveUserId, // Send guest ID or real ID
+                        visionContext
+                    }),
+                });
 
-                    const apiData = await res.json();
-                    console.log('ElizaOS Response:', apiData);
-
-                    // If response was received, manually add to messages
-                    // (Realtime should also catch this, but belt and suspenders)
-                    if (apiData.response) {
-                        const aiMessage: Message = {
-                            id: 'ai-' + Date.now(),
-                            content: apiData.response,
-                            role: 'assistant',
-                            created_at: new Date().toISOString()
-                        };
-                        setMessages(prev => {
-                            // Avoid duplicates (check if Realtime already added it)
-                            const exists = prev.some(m =>
-                                m.role === 'assistant' && m.content === apiData.response
-                            );
-                            return exists ? prev : [...prev, aiMessage];
-                        });
-                    }
-                } catch (err) {
-                    console.error('Failed to trigger AI:', err);
-                } finally {
-                    setLoading(false);
+                if (!res.ok) {
+                    throw new Error(`API Error: ${res.status}`);
                 }
+
+                const apiData = await res.json();
+                console.log('ElizaOS Response:', apiData);
+
+                // For Guest Mode OR if Realtime is slow/fails
+                if (apiData.response) {
+                    const aiMessage: Message = {
+                        id: 'ai-' + Date.now(),
+                        content: apiData.response,
+                        role: 'assistant',
+                        created_at: new Date().toISOString()
+                    };
+                    setMessages(prev => {
+                        // Avoid duplicates (check if Realtime already added it - mainly for logged in users)
+                        const exists = prev.some(m =>
+                            m.role === 'assistant' && m.content === apiData.response
+                        );
+                        return exists ? prev : [...prev, aiMessage];
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to trigger AI:', err);
+
+                // Demo fallback if API fails
+                const errorMsg: Message = {
+                    id: 'err-' + Date.now(),
+                    content: "Sorry, I'm having trouble connecting to the network (Demo Mode).",
+                    role: 'assistant',
+                    created_at: new Date().toISOString()
+                };
+                setMessages(prev => [...prev, errorMsg]);
+
+            } finally {
+                setLoading(false);
             }
         }
     };
 
-    return { messages, loading, sendMessage, user };
+    // Return guestId as user if valid user is null, to trick UI into thinking we are logged in for demo
+    // Or we keep user as null but pass a 'isGuest' flag.
+    // Simpler for existing UI: return a fake user object if guest
+    const exposedUser = user || (guestId ? { id: guestId, email: 'guest@demo.com' } as User : null);
+
+    return { messages, loading, sendMessage, user: exposedUser };
 }

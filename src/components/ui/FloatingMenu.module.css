@@ -63,13 +63,25 @@
     filter: drop-shadow(1px 1px 0 #d4141d);
 }
 
-/* Icons - Force White */
+/* Icons - Force White with Red Outline */
 .btnIcon {
     font-size: 32px;
-    /* Turn emojis into high-contrast white icons if possible, or use filter */
-    filter: grayscale(100%) brightness(1000%);
+    /* Turn emojis into high-contrast white icons with red outline */
+    filter:
+        grayscale(100%) brightness(1000%) drop-shadow(1px 0 0 #d4141d) drop-shadow(-1px 0 0 #d4141d) drop-shadow(0 1px 0 #d4141d) drop-shadow(0 -1px 0 #d4141d) drop-shadow(0 0 2px #d4141d) drop-shadow(0 0 3px rgba(212, 20, 29, 0.6));
+    transform: rotate(0deg);
     transform: rotate(0deg);
     z-index: 2;
+}
+
+.customIcon {
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    /* Apply red outline/shadow to text/svg as well */
+    filter: drop-shadow(1px 0 0 #d4141d) drop-shadow(-1px 0 0 #d4141d) drop-shadow(0 1px 0 #d4141d) drop-shadow(0 -1px 0 #d4141d);
 }
 
 /* Label - P5 Tooltip Style */

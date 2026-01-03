@@ -51,7 +51,7 @@ async function getOrCreateSession(userId: string, agentId: string): Promise<stri
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { message, userId } = body;
+        const { message, userId, visionContext } = body;
 
         if (!message || !userId) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
@@ -66,12 +66,18 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Failed to create ElizaOS session' }, { status: 500 });
         }
 
+        // Prepare Message with Context
+        let finalMessage = message;
+        if (visionContext) {
+            finalMessage = `[VISION_CONTEXT: ${visionContext}]\n\nUser: ${message}`;
+        }
+
         // Send message via Sessions API
         const elizaRes = await fetch(`${elizaUrl}/api/messaging/sessions/${sessionId}/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                content: message,
+                content: finalMessage,
                 mode: 'sync'
             }),
         });

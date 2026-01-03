@@ -7,17 +7,30 @@ interface CameraViewProps {
     onAnalysis?: (analysis: string) => void;
     isEnabled: boolean;
     onToggle: () => void;
+    mode?: 'box' | 'fullscreen';
+    facingMode?: 'user' | 'environment';
 }
 
-export default function CameraView({ onAnalysis, isEnabled, onToggle }: CameraViewProps) {
+export default function CameraView({
+    onAnalysis,
+    isEnabled,
+    onToggle,
+    mode = 'box',
+    facingMode = 'user'
+}: CameraViewProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
+    const prevFrameRef = useRef<Uint8ClampedArray | null>(null);
+
+    // Config
+    const SCENE_CHANGE_THRESHOLD = 0.15; // 15% pixel change required to trigger analysis
 
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [lastAnalysis, setLastAnalysis] = useState<string>('');
     const [error, setError] = useState<string>('');
     const [countdown, setCountdown] = useState(5);
+    // facingMode is now a prop
 
     // Start/Stop camera
     useEffect(() => {
@@ -30,7 +43,7 @@ export default function CameraView({ onAnalysis, isEnabled, onToggle }: CameraVi
         return () => {
             stopCamera();
         };
-    }, [isEnabled]);
+    }, [isEnabled, facingMode]); // Restart when mode changes
 
     // Auto-analyze every 5 seconds
     useEffect(() => {
@@ -52,7 +65,11 @@ export default function CameraView({ onAnalysis, isEnabled, onToggle }: CameraVi
     const startCamera = async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user', width: 640, height: 480 }
+                video: {
+                    facingMode: facingMode,
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                }
             });
 
             if (videoRef.current) {
@@ -86,7 +103,48 @@ export default function CameraView({ onAnalysis, isEnabled, onToggle }: CameraVi
 
         if (!ctx) return;
 
-        // Draw current frame to canvas
+        // 1. Scene Change Detection
+        // Draw small version for comparison
+        const smallWidth = 32;
+        const smallHeight = 24;
+
+        // Create temp canvas if comparing
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = smallWidth;
+        tempCanvas.height = smallHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        if (!tempCtx) return;
+
+        tempCtx.drawImage(video, 0, 0, smallWidth, smallHeight);
+        const currentFrameData = tempCtx.getImageData(0, 0, smallWidth, smallHeight).data;
+
+        if (prevFrameRef.current) {
+            let diff = 0;
+            const totalPixels = currentFrameData.length / 4;
+
+            for (let i = 0; i < currentFrameData.length; i += 4) {
+                const rDiff = Math.abs(currentFrameData[i] - prevFrameRef.current[i]);
+                const gDiff = Math.abs(currentFrameData[i + 1] - prevFrameRef.current[i + 1]);
+                const bDiff = Math.abs(currentFrameData[i + 2] - prevFrameRef.current[i + 2]);
+
+                if ((rDiff + gDiff + bDiff) / 3 > 30) { // Significant color change
+                    diff++;
+                }
+            }
+
+            const changePercent = diff / totalPixels;
+
+            if (changePercent < SCENE_CHANGE_THRESHOLD) {
+                // Not enough change, skip analysis
+                setCountdown(5); // Reset countdown without analyzing
+                return;
+            }
+        }
+
+        // Update previous frame
+        prevFrameRef.current = currentFrameData;
+
+        // 2. Perform Analysis (Full Resolution)
         canvas.width = video.videoWidth || 640;
         canvas.height = video.videoHeight || 480;
         ctx.drawImage(video, 0, 0);
@@ -121,7 +179,7 @@ export default function CameraView({ onAnalysis, isEnabled, onToggle }: CameraVi
     }
 
     return (
-        <div className={styles.container}>
+        <div className={`${styles.container} ${mode === 'fullscreen' ? styles.fullscreen : ''}`}>
             <div className={styles.header}>
                 <span className={styles.recordingDot} />
                 <span className={styles.title}>SCANNING</span>
@@ -135,6 +193,7 @@ export default function CameraView({ onAnalysis, isEnabled, onToggle }: CameraVi
                     playsInline
                     muted
                     className={styles.video}
+                    style={{ transform: facingMode === 'user' ? 'scaleX(-1)' : 'none' }}
                 />
                 <canvas ref={canvasRef} style={{ display: 'none' }} />
 
@@ -149,11 +208,11 @@ export default function CameraView({ onAnalysis, isEnabled, onToggle }: CameraVi
                 </div>
             </div>
 
-            {lastAnalysis && (
+            {/* {lastAnalysis && (
                 <div className={styles.analysisBox}>
                     <span className={styles.analysisText}>{lastAnalysis}</span>
                 </div>
-            )}
+            )} */}
 
             {error && (
                 <div className={styles.error}>{error}</div>

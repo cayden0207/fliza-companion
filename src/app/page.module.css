@@ -1,9 +1,16 @@
 .container {
   width: 100vw;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
   position: relative;
   overflow: hidden;
   background: var(--gradient-bg);
+  transition: background 0.5s ease;
+}
+
+.transparent {
+  background: transparent !important;
 }
 
 .uiLayer {

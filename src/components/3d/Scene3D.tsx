@@ -12,6 +12,8 @@ import styles from './Scene3D.module.css';
 interface Scene3DProps {
   modelPath?: string;
   onVRMLoaded?: (vrm: VRM) => void;
+  speechText?: string | null;
+  isArActive?: boolean;
 }
 
 // Animation list
@@ -29,11 +31,15 @@ const RANDOM_ANIMATIONS = [
 
 export default function Scene3D({
   modelPath = '/models/Fliza Return.vrm',
-  onVRMLoaded
+  onVRMLoaded,
+  speechText,
+  isArActive = false
 }: Scene3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
   const initRef = useRef(false);
   const vrmRef = useRef<VRM | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -50,8 +56,11 @@ export default function Scene3D({
     const scene = new THREE.Scene();
 
     // Camera
+    // Camera
     const camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 100);
+    // Base position
     camera.position.set(0, 1.3, 2.5);
+    cameraRef.current = camera;
 
     // Renderer
     const renderer = new THREE.WebGLRenderer({
@@ -304,6 +313,24 @@ export default function Scene3D({
 
       if (vrmRef.current) {
         vrmRef.current.update(deltaTime);
+
+        // Update bubble position if active
+        if (bubbleRef.current && vrmRef.current) {
+          const headBone = vrmRef.current.humanoid?.getNormalizedBoneNode('head');
+          if (headBone) {
+            const vector = new THREE.Vector3();
+            headBone.getWorldPosition(vector);
+            vector.y += 0.3; // Offset above head
+
+            // Project to 2D
+            vector.project(camera);
+
+            const x = (vector.x * .5 + .5) * container.clientWidth;
+            const y = -(vector.y * .5 - .5) * container.clientHeight;
+
+            bubbleRef.current.style.transform = `translate(${x}px, ${y}px)`;
+          }
+        }
       }
       if (mixer) {
         mixer.update(deltaTime);
@@ -337,6 +364,20 @@ export default function Scene3D({
     };
   }, []);
 
+  // Handle AR Mode Camera Adjustment
+  useEffect(() => {
+    if (!cameraRef.current) return;
+
+    if (isArActive) {
+      // Move camera back to make model look smaller/grounded in Fullscreen
+      // Or move Y up slightly if needed
+      cameraRef.current.position.set(0, 1.1, 5.0); // Further back
+    } else {
+      // Reset to portrait close-up
+      cameraRef.current.position.set(0, 1.3, 2.5);
+    }
+  }, [isArActive]);
+
   return (
     <div className={styles.container} ref={containerRef}>
       {isLoading && (
@@ -349,6 +390,22 @@ export default function Scene3D({
               <div className={styles.progressFill} style={{ width: `${loadProgress}%` }} />
             </div>
           </div>
+        </div>
+      )}
+
+      {speechText && (
+        <div
+          ref={bubbleRef}
+          className={styles.speechBubble}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            willChange: 'transform',
+            zIndex: 100 // Ensure it is on top
+          }}
+        >
+          <div className={styles.bubbleContent}>{speechText}</div>
         </div>
       )}
     </div>
