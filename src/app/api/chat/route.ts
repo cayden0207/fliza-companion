@@ -8,9 +8,6 @@ const elizaUrl = process.env.ELIZA_URL || 'https://fliza-agent-production.up.rai
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// In-memory session cache (for production, use Redis or DB)
-const sessionCache: Map<string, { sessionId: string; expiresAt: Date }> = new Map();
-
 // Design intent detection keywords
 const DESIGN_KEYWORDS = ['design', 'create', 'generate', 'make', 'draw', 'artwork', 'poster', 'image', 'picture', 'sketch'];
 const CONTEXT_KEYWORDS = ['this', 'see', 'camera', 'looking', 'photo', 'here', 'showing'];
@@ -24,44 +21,6 @@ function detectDesignIntent(message: string): { isDesignRequest: boolean; prompt
         return { isDesignRequest: true, prompt: message };
     }
     return { isDesignRequest: false, prompt: '' };
-}
-
-// Get or create ElizaOS session for a user
-async function getOrCreateSession(userId: string, agentId: string): Promise<string | null> {
-    // Check cache first
-    const cached = sessionCache.get(userId);
-    if (cached && new Date() < cached.expiresAt) {
-        return cached.sessionId;
-    }
-
-    // Create new session
-    try {
-        const res = await fetch(`${elizaUrl}/api/messaging/sessions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agentId, userId }),
-        });
-
-        if (!res.ok) {
-            console.error('Session creation failed:', await res.text());
-            return null;
-        }
-
-        const data = await res.json();
-        const expiresAt = new Date(data.expiresAt);
-
-        // Cache the session (with 5 min buffer before expiry)
-        sessionCache.set(userId, {
-            sessionId: data.sessionId,
-            expiresAt: new Date(expiresAt.getTime() - 5 * 60 * 1000)
-        });
-
-        console.log('Created new ElizaOS session:', data.sessionId);
-        return data.sessionId;
-    } catch (e) {
-        console.error('Session creation error:', e);
-        return null;
-    }
 }
 
 export async function POST(req: Request) {
@@ -89,66 +48,69 @@ export async function POST(req: Request) {
         // Get agent ID
         const agentId = process.env.ELIZA_AGENT_ID || '16f68732-3783-05ea-b38a-ad1e1c7ea90c';
 
-        // Get or create session
-        const sessionId = await getOrCreateSession(userId, agentId);
-        if (!sessionId) {
-            return NextResponse.json({ error: 'Failed to create ElizaOS session' }, { status: 500 });
-        }
-
-        // Prepare Message with Context
+        // Prepare message text with optional vision context
         let finalMessage = message;
         if (visionContext) {
             finalMessage = `[VISION_CONTEXT: ${visionContext}]\n\nUser: ${message}`;
         }
 
-        // Send message via Sessions API
-        const elizaRes = await fetch(`${elizaUrl}/api/messaging/sessions/${sessionId}/messages`, {
+        // Use a simple room ID based on user ID for persistent conversation
+        const roomId = `room-${userId}`;
+
+        console.log(`Sending message to ElizaOS: ${elizaUrl}/api/agents/${agentId}/message`);
+
+        // Send message using the correct ElizaOS API format
+        const elizaRes = await fetch(`${elizaUrl}/api/agents/${agentId}/message`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                content: finalMessage,
-                mode: 'sync'
+                text: finalMessage,
+                userId: userId,
+                roomId: roomId
             }),
         });
 
         if (!elizaRes.ok) {
             const errText = await elizaRes.text();
             console.error('Eliza Message Error:', elizaRes.status, errText);
-
-            // If session expired, clear cache and retry
-            if (elizaRes.status === 404 || errText.includes('session')) {
-                sessionCache.delete(userId);
-            }
-
-            return NextResponse.json({ error: `Eliza failed: ${elizaRes.status}`, details: errText.slice(0, 200) }, { status: 500 });
+            return NextResponse.json({
+                error: `Eliza failed: ${elizaRes.status}`,
+                details: errText.slice(0, 200)
+            }, { status: 500 });
         }
 
         const elizaData = await elizaRes.json();
+        console.log('ElizaOS Response:', elizaData);
 
-        // Extract response text
-        const responseText = elizaData.agentResponse?.text;
+        // Extract response text - ElizaOS returns an array of messages
+        // The response format is typically: [{ text: "...", user: "agent", ... }]
+        let responseText = '';
+        if (Array.isArray(elizaData) && elizaData.length > 0) {
+            responseText = elizaData[0]?.text || elizaData[0]?.content || '';
+        } else if (typeof elizaData === 'object') {
+            responseText = elizaData.text || elizaData.content || elizaData.response || '';
+        }
+
         if (responseText) {
-            // Save AI response to Supabase
-            const { error } = await supabase.from('messages').insert({
-                user_id: userId,
-                role: 'assistant',
-                content: responseText,
-                metadata: {
-                    thought: elizaData.agentResponse?.thought,
-                    actions: elizaData.agentResponse?.actions,
-                    sessionId: sessionId
-                }
-            });
+            // Save AI response to Supabase (optional, for logged-in users)
+            if (!userId.startsWith('guest-')) {
+                const { error } = await supabase.from('messages').insert({
+                    user_id: userId,
+                    role: 'assistant',
+                    content: responseText,
+                    metadata: { roomId }
+                });
 
-            if (error) {
-                console.error('Supabase Write Error:', error);
+                if (error) {
+                    console.error('Supabase Write Error:', error);
+                }
             }
         }
 
         return NextResponse.json({
             success: true,
-            response: responseText,
-            sessionId
+            response: responseText || "I received your message but couldn't generate a response.",
+            roomId
         });
 
     } catch (error: any) {
