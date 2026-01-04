@@ -390,7 +390,7 @@ export default function Scene3D({
           if (session) {
             if (hitTestSourceRequestedRef.current === false) {
               session.requestReferenceSpace('viewer').then((referenceSpace) => {
-                session.requestHitTestSource({ space: referenceSpace }).then((source) => {
+                session.requestHitTestSource?.({ space: referenceSpace })?.then((source) => {
                   hitTestSourceRef.current = source;
                 });
               });
