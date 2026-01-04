@@ -83,7 +83,7 @@ export default function Scene3D({
     // AR Button
     const arButton = ARButton.createButton(renderer, {
       requiredFeatures: ['hit-test'],
-      optionalFeatures: ['dom-overlay'],
+      optionalFeatures: ['dom-overlay', 'local-floor'], // dom-overlay is optional for better support
       domOverlay: { root: document.body }
     });
     // Style the button yourself or hide it if you want to trigger programmatically,
