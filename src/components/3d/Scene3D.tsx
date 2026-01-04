@@ -394,10 +394,20 @@ export default function Scene3D({
                   hitTestSourceRef.current = source;
                 });
               });
+
+              // Ensure camera feed is visible
+              scene.background = null;
+              // Hide fake shadow in AR
+              shadowMesh.visible = false;
+
               session.addEventListener('end', () => {
                 hitTestSourceRequestedRef.current = false;
                 hitTestSourceRef.current = null;
                 if (reticle.visible) reticle.visible = false;
+
+                // Restore settings
+                scene.background = null; // Still null for transparent canvas
+                shadowMesh.visible = true;
               });
               hitTestSourceRequestedRef.current = true;
             }
