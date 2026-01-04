@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const elizaUrl = process.env.ELIZA_URL || 'http://fliza-agent.railway.internal:3000';
+// NOTE: .internal addresses are NOT accessible from Vercel or Localhost. Use the PUBLIC Railway URL.
+const elizaUrl = process.env.ELIZA_URL || 'https://fliza-agent-production.up.railway.app';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
