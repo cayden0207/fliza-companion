@@ -17,11 +17,11 @@ interface PhoneInterfaceProps {
     onClose: () => void;
     visionContext?: string;
     onLastMessageChange?: (message: string) => void;
-    // New props from refactor
     messages: Message[];
     sendMessage: (content: string, role: 'user' | 'assistant', visionContext?: string) => Promise<void>;
     user: any;
     loading: boolean;
+    onDesignAction?: (prompt: string, attachedImage?: string | null) => void;
 }
 
 export default function PhoneInterface({
@@ -32,33 +32,58 @@ export default function PhoneInterface({
     messages,
     sendMessage,
     user,
-    loading
+    loading,
+    onDesignAction
 }: PhoneInterfaceProps) {
-    // Removed internal useChatHistory hook
     const [inputValue, setInputValue] = useState('');
+    const [attachedImage, setAttachedImage] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Auto-scroll and notify parent of new messages
+    // Auto-scroll
     useEffect(() => {
         if (isOpen) {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }
-
-        // Notify parent is now handled by page.tsx logic potentially, 
-        // but we keep this specifically for when the phone is open if needed,
-        // OR we rely on page.tsx to handle speech bubbles.
-        // Actually, page.tsx handles speech bubbles via its own effect on messages?
-        // Let's keep this prop for backward compatibility if page.tsx uses it,
-        // but page.tsx will likely monitor messages directly now.
     }, [messages, isOpen]);
+
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            setAttachedImage(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const clearAttachedImage = () => {
+        setAttachedImage(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
 
     const handleSend = async () => {
         if (!inputValue.trim()) return;
 
         const content = inputValue;
-        setInputValue(''); // Clear immediately for UX
+        setInputValue('');
+
+        // Check for design keywords before sending
+        const designKeywords = ['design', 'create', 'generate', 'make', 'draw', 'artwork', 'poster', 'image', 'picture'];
+        const hasDesignIntent = designKeywords.some(kw => content.toLowerCase().includes(kw));
+
+        if (hasDesignIntent && onDesignAction) {
+            // Trigger design action directly if we detect intent
+            onDesignAction(content, attachedImage);
+            clearAttachedImage();
+            return;
+        }
 
         await sendMessage(content, 'user', visionContext);
+        clearAttachedImage();
     };
 
     if (!isOpen) return null;
@@ -131,7 +156,36 @@ export default function PhoneInterface({
 
                 {/* Input Area */}
                 <div className={styles.inputArea}>
+                    {/* Attached Image Preview */}
+                    {attachedImage && (
+                        <div className={styles.attachedPreview}>
+                            <img src={attachedImage} alt="Attached" className={styles.previewImage} />
+                            <button className={styles.removeAttachment} onClick={clearAttachedImage}>✕</button>
+                        </div>
+                    )}
+
                     <div className={styles.inputWrapper}>
+                        {/* Image Upload Button */}
+                        <button
+                            className={styles.attachBtn}
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={!user}
+                            title="Attach Image"
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                <polyline points="21 15 16 10 5 21" />
+                            </svg>
+                        </button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            style={{ display: 'none' }}
+                        />
+
                         <VoiceInput
                             onTranscript={(text) => setInputValue(prev => prev + text)}
                             disabled={!user}
@@ -146,7 +200,9 @@ export default function PhoneInterface({
                             disabled={!user}
                         />
                         <button className={styles.sendBtn} onClick={handleSend} disabled={!user}>
-                            SEND
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                            </svg>
                         </button>
                     </div>
                 </div>

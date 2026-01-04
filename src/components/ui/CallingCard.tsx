@@ -8,13 +8,17 @@ interface CallingCardProps {
     onClose: () => void;
     title?: string;
     message?: string;
+    image?: string | null; // Base64 or URL of generated image
+    isLoading?: boolean;
 }
 
 export default function CallingCard({
     isOpen,
     onClose,
     title = "TAKE YOUR HEART",
-    message = "This feature is currently under construction by the Phantom Thieves!"
+    message = "This feature is currently under construction by the Phantom Thieves!",
+    image,
+    isLoading = false
 }: CallingCardProps) {
     if (!isOpen) return null;
 
@@ -28,12 +32,27 @@ export default function CallingCard({
                         {title}
                     </div>
 
-                    <div className={styles.message}>
-                        {message}
-                    </div>
+                    {isLoading ? (
+                        <div className={styles.loading}>
+                            <div className={styles.spinner} />
+                            <span>Creating your design... 🎨</span>
+                        </div>
+                    ) : (
+                        <>
+                            {image && (
+                                <div className={styles.imageWrapper}>
+                                    <img src={image} alt="Generated Design" className={styles.generatedImage} />
+                                </div>
+                            )}
+
+                            <div className={styles.message}>
+                                {message}
+                            </div>
+                        </>
+                    )}
 
                     <button className={styles.closeBtn} onClick={onClose}>
-                        ACKNOWLEDGE
+                        {isLoading ? 'CANCEL' : 'ACKNOWLEDGE'}
                     </button>
                 </div>
             </div>

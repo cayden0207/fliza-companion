@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { VRM } from '@pixiv/three-vrm';
 import Scene3D from '@/components/3d/Scene3D';
 import FloatingMenu from '@/components/ui/FloatingMenu';
 import PhoneInterface from '@/components/ui/PhoneInterface';
 import DateDisplay from '@/components/ui/DateDisplay';
-import CameraView from '@/components/ui/CameraView';
-import VoiceInput from '@/components/ui/VoiceInput'; // Import VoiceInput
-import { useChatHistory } from '@/hooks/useChatHistory'; // Import hook
+import CameraView, { CameraViewHandle } from '@/components/ui/CameraView';
+import VoiceInput from '@/components/ui/VoiceInput';
+import CallingCard from '@/components/ui/CallingCard';
+import { useChatHistory } from '@/hooks/useChatHistory';
 import styles from './page.module.css';
 
 import ProfileCard from '@/components/ui/ProfileCard';
@@ -19,11 +20,19 @@ export default function Home() {
   const [isPhoneOpen, setIsPhoneOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const [isArMode, setIsArMode] = useState(false); // AR Mode state
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment'); // Camera facing mode
+  const [isArMode, setIsArMode] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [visionContext, setVisionContext] = useState<string>('');
 
-  // Lifted Chat State (This manages user and messages)
+  // Design Agent State
+  const [designCardOpen, setDesignCardOpen] = useState(false);
+  const [designLoading, setDesignLoading] = useState(false);
+  const [designResult, setDesignResult] = useState<{ image: string | null; message: string }>({ image: null, message: '' });
+
+  // CameraView ref for capturing frames
+  const cameraRef = useRef<CameraViewHandle>(null);
+
+  // Lifted Chat State
   const { messages, sendMessage, user, loading } = useChatHistory();
 
   // Memoize callback to prevent re-renders
@@ -45,18 +54,67 @@ export default function Home() {
     const nextState = !isArMode;
     setIsArMode(nextState);
     if (nextState) {
-      setIsCameraActive(true); // Force camera on for AR
+      setIsCameraActive(true);
     } else {
-      setIsCameraActive(false); // Turn off camera when AR is off
+      setIsCameraActive(false);
     }
   }, [isArMode]);
 
-  // Handle new chat messages for AR bubble (Now watching messages directly)
+  // Handle Design Action (triggered when chat detects design intent)
+  const handleDesignAction = useCallback(async (prompt: string, attachedImage?: string | null) => {
+    setDesignCardOpen(true);
+    setDesignLoading(true);
+    setDesignResult({ image: null, message: '' });
+
+    // Get image: either from attachment or capture from camera
+    let imageToUse = attachedImage;
+    if (!imageToUse && cameraRef.current && isCameraActive) {
+      imageToUse = cameraRef.current.captureCurrentFrame();
+    }
+
+    if (!imageToUse) {
+      setDesignLoading(false);
+      setDesignResult({ image: null, message: "I need an image to create a design! Please turn on the camera or attach a photo." });
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/design', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageToUse, prompt })
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.image) {
+        setDesignResult({ image: data.image, message: data.text || "Here's your custom design! 🎨" });
+      } else {
+        setDesignResult({ image: null, message: data.error || "Design generation failed. Try again!" });
+      }
+    } catch (error: any) {
+      console.error('Design error:', error);
+      setDesignResult({ image: null, message: "Something went wrong during design creation." });
+    } finally {
+      setDesignLoading(false);
+    }
+  }, [isCameraActive]);
+
+  // Extended sendMessage that checks for design intent
+  const handleSendMessage = useCallback(async (content: string, role: 'user' | 'assistant' = 'user', visionCtx?: string, attachedImage?: string) => {
+    // Send to chat API first
+    const result = await sendMessage(content, role, visionCtx);
+
+    // Check if the API returned a TRIGGER_DESIGN action
+    // This is handled in useChatHistory now, but we can also check here
+    // For now, we rely on the chat route returning the action
+  }, [sendMessage]);
+
+  // Handle new chat messages for AR bubble
   useEffect(() => {
     const lastMsg = messages[messages.length - 1];
     if (lastMsg && lastMsg.role === 'assistant') {
       setSpeechText(lastMsg.content);
-      // Auto-hide after 10 seconds
       setTimeout(() => setSpeechText(null), 10000);
     }
   }, [messages]);
@@ -66,7 +124,7 @@ export default function Home() {
       className={`${styles.container} ${isArMode ? styles.transparent : ''}`}
       style={isArMode ? { background: 'transparent' } : undefined}
     >
-      {/* 3D Scene - Always visible, but background is now transparent in AR */}
+      {/* 3D Scene */}
       <div className={styles.sceneLayer}>
         <Scene3D
           onVRMLoaded={handleVRMLoaded}
@@ -78,8 +136,9 @@ export default function Home() {
       {/* Background Music */}
       <audio src="/bgm.mp3" loop autoPlay />
 
-      {/* Camera View - Floating or Fullscreen AR */}
+      {/* Camera View with ref */}
       <CameraView
+        ref={cameraRef}
         isEnabled={isCameraActive}
         onToggle={() => setIsCameraActive(!isCameraActive)}
         onAnalysis={handleVisionAnalysis}
@@ -114,6 +173,7 @@ export default function Home() {
           sendMessage={sendMessage}
           user={user}
           loading={loading}
+          onDesignAction={handleDesignAction}
         />
 
         {/* AR Quick Voice Trigger (Only in AR Mode) */}
@@ -125,7 +185,7 @@ export default function Home() {
             transform: 'translateX(-50%)',
             zIndex: 100,
             display: 'flex',
-            alignItems: 'center', // Align horizontally
+            alignItems: 'center',
             gap: '20px'
           }}>
             <button
@@ -158,10 +218,8 @@ export default function Home() {
 
             <VoiceInput
               onTranscript={(text) => sendMessage(text, 'user', visionContext)}
-            // disabled={!user} // Creating guest mode, so we allow it!
             />
 
-            {/* Login Hint (re-positioned or hidden to avoid clutter) */}
             {!user && <span style={{
               position: 'absolute',
               bottom: '-30px',
@@ -180,8 +238,17 @@ export default function Home() {
           onClose={() => setIsProfileOpen(false)}
           userId={user?.id}
         />
+
+        {/* Design Result Calling Card */}
+        <CallingCard
+          isOpen={designCardOpen}
+          onClose={() => setDesignCardOpen(false)}
+          title="PHANTOM DESIGN"
+          message={designResult.message}
+          image={designResult.image}
+          isLoading={designLoading}
+        />
       </div>
     </main>
   );
 }
-

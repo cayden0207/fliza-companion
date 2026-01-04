@@ -3,12 +3,27 @@ import { NextResponse } from 'next/server';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const elizaUrl = process.env.ELIZA_URL || 'http://localhost:3002';
+const elizaUrl = process.env.ELIZA_URL || 'http://fliza-agent.railway.internal:3000';
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // In-memory session cache (for production, use Redis or DB)
 const sessionCache: Map<string, { sessionId: string; expiresAt: Date }> = new Map();
+
+// Design intent detection keywords
+const DESIGN_KEYWORDS = ['design', 'create', 'generate', 'make', 'draw', 'artwork', 'poster', 'image', 'picture', 'sketch'];
+const CONTEXT_KEYWORDS = ['this', 'see', 'camera', 'looking', 'photo', 'here', 'showing'];
+
+function detectDesignIntent(message: string): { isDesignRequest: boolean; prompt: string } {
+    const lower = message.toLowerCase();
+    const hasDesignKeyword = DESIGN_KEYWORDS.some(kw => lower.includes(kw));
+    const hasContextKeyword = CONTEXT_KEYWORDS.some(kw => lower.includes(kw));
+
+    if (hasDesignKeyword && hasContextKeyword) {
+        return { isDesignRequest: true, prompt: message };
+    }
+    return { isDesignRequest: false, prompt: '' };
+}
 
 // Get or create ElizaOS session for a user
 async function getOrCreateSession(userId: string, agentId: string): Promise<string | null> {
@@ -51,10 +66,23 @@ async function getOrCreateSession(userId: string, agentId: string): Promise<stri
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { message, userId, visionContext } = body;
+        const { message, userId, visionContext, attachedImage } = body;
 
         if (!message || !userId) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+        }
+
+        // Check for design intent
+        const designIntent = detectDesignIntent(message);
+        if (designIntent.isDesignRequest) {
+            console.log('Design intent detected:', message);
+            return NextResponse.json({
+                success: true,
+                action: 'TRIGGER_DESIGN',
+                designPrompt: designIntent.prompt,
+                response: "I'll create a design based on what I see. Give me a moment... 🎨",
+                attachedImage: attachedImage || null
+            });
         }
 
         // Get agent ID
@@ -127,4 +155,3 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
-

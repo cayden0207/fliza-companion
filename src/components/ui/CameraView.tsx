@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import styles from './CameraView.module.css';
 
 interface CameraViewProps {
@@ -11,13 +11,17 @@ interface CameraViewProps {
     facingMode?: 'user' | 'environment';
 }
 
-export default function CameraView({
+export interface CameraViewHandle {
+    captureCurrentFrame: () => string | null;
+}
+
+const CameraView = forwardRef<CameraViewHandle, CameraViewProps>(({
     onAnalysis,
     isEnabled,
     onToggle,
     mode = 'box',
     facingMode = 'user'
-}: CameraViewProps) {
+}, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -30,7 +34,24 @@ export default function CameraView({
     const [lastAnalysis, setLastAnalysis] = useState<string>('');
     const [error, setError] = useState<string>('');
     const [countdown, setCountdown] = useState(5);
-    // facingMode is now a prop
+
+    // Expose captureCurrentFrame to parent via ref
+    useImperativeHandle(ref, () => ({
+        captureCurrentFrame: (): string | null => {
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
+            if (!video || !canvas) return null;
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return null;
+
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            ctx.drawImage(video, 0, 0);
+
+            return canvas.toDataURL('image/jpeg', 0.8);
+        }
+    }));
 
     // Start/Stop camera
     useEffect(() => {
@@ -208,15 +229,13 @@ export default function CameraView({
                 </div>
             </div>
 
-            {/* {lastAnalysis && (
-                <div className={styles.analysisBox}>
-                    <span className={styles.analysisText}>{lastAnalysis}</span>
-                </div>
-            )} */}
-
             {error && (
                 <div className={styles.error}>{error}</div>
             )}
         </div>
     );
-}
+});
+
+CameraView.displayName = 'CameraView';
+
+export default CameraView;

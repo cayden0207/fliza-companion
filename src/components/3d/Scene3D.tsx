@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { ARButton } from 'three/examples/jsm/webxr/ARButton.js';
 import { VRMLoaderPlugin, VRM } from '@pixiv/three-vrm';
 import { mixamoVRMRigMap } from '@/lib/mixamoVRMRigMap';
 import styles from './Scene3D.module.css';
@@ -40,6 +41,9 @@ export default function Scene3D({
   const initRef = useRef(false);
   const vrmRef = useRef<VRM | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const reticleRef = useRef<THREE.Mesh | null>(null);
+  const hitTestSourceRef = useRef<XRHitTestSource | null>(null);
+  const hitTestSourceRequestedRef = useRef(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -55,7 +59,6 @@ export default function Scene3D({
     // Scene
     const scene = new THREE.Scene();
 
-    // Camera
     // Camera
     const camera = new THREE.PerspectiveCamera(30, width / height, 0.1, 100);
     // Base position
@@ -74,7 +77,48 @@ export default function Scene3D({
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.LinearToneMapping;
     renderer.toneMappingExposure = 1.0;
+    renderer.xr.enabled = true; // Enable WebXR
     container.appendChild(renderer.domElement);
+
+    // AR Button
+    const arButton = ARButton.createButton(renderer, {
+      requiredFeatures: ['hit-test'],
+      optionalFeatures: ['dom-overlay'],
+      domOverlay: { root: document.body }
+    });
+    // Style the button yourself or hide it if you want to trigger programmatically,
+    // but ARButton handles the session creation logic best.
+    // For now, let's append it to body but styling might be needed.
+    // However, user has their own "AR Switch". We might want to just let this button appear
+    // at the bottom or integration.
+    // Let's hide it and click it programmatically? Or just style it to match.
+    // For "Try WebXR", let's leave it visible but styled.
+    arButton.style.display = 'none'; // We'll trigger it or maybe just leave it hidden for now until we decide UI.
+    // Actually, for "Try", we need a way to enter. 
+    // Let's make it visible at bottom center.
+    arButton.style.display = 'block';
+    arButton.style.position = 'absolute';
+    arButton.style.bottom = '20px';
+    arButton.style.left = '50%';
+    arButton.style.transform = 'translateX(-50%)';
+    arButton.style.zIndex = '1000';
+    arButton.style.padding = '10px 20px';
+    arButton.style.border = '2px solid white';
+    arButton.style.background = 'rgba(0,0,0,0.5)';
+    arButton.style.color = 'white';
+    arButton.textContent = 'START AR (WebXR)';
+    document.body.appendChild(arButton);
+
+
+    // Reticle (for Hit Test)
+    const reticle = new THREE.Mesh(
+      new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff }) // White ring
+    );
+    reticle.matrixAutoUpdate = false;
+    reticle.visible = false;
+    scene.add(reticle);
+    reticleRef.current = reticle;
 
     // Controls
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -99,7 +143,7 @@ export default function Scene3D({
     fillLight.position.set(-5, 5, -5);
     scene.add(fillLight);
 
-    // Floor shadow
+    // Floor shadow (keep for non-AR, hide in AR if placed on floor)
     const shadowCanvas = document.createElement('canvas');
     shadowCanvas.width = 256;
     shadowCanvas.height = 256;
@@ -121,6 +165,33 @@ export default function Scene3D({
     shadowMesh.rotation.x = -Math.PI / 2;
     shadowMesh.position.y = 0.01;
     scene.add(shadowMesh);
+
+    // Tap to Place
+    const onSelect = () => {
+      if (reticle.visible && vrmRef.current) {
+        // Place model at reticle position
+        const position = new THREE.Vector3();
+        const quaternion = new THREE.Quaternion();
+        const scale = new THREE.Vector3();
+        reticle.matrix.decompose(position, quaternion, scale);
+
+        vrmRef.current.scene.position.copy(position);
+        // Face the camera roughly or keep rotation? 
+        // Typically interactive placement means just set position 
+        // We might want to make it face the user:
+        // vrmRef.current.scene.lookAt(camera.position.x, vrmRef.current.scene.position.y, camera.position.z);
+
+        // Also move shadow
+        shadowMesh.position.x = position.x;
+        shadowMesh.position.z = position.z;
+        shadowMesh.position.y = position.y + 0.01;
+      }
+    };
+
+    const controller = renderer.xr.getController(0);
+    controller.addEventListener('select', onSelect);
+    scene.add(controller);
+
 
     // Animation state
     const clock = new THREE.Clock();
@@ -306,21 +377,67 @@ export default function Scene3D({
       }
     );
 
-    // Animation loop
-    const animate = () => {
-      animationId = requestAnimationFrame(animate);
+    // Animation loop (Use setAnimationLoop for WebXR)
+    renderer.setAnimationLoop((timestamp, frame) => {
       const deltaTime = clock.getDelta();
 
       if (vrmRef.current) {
         vrmRef.current.update(deltaTime);
 
-        // Update bubble position if active
+        // WebXR Hit Test Logic
+        if (frame) {
+          const session = renderer.xr.getSession();
+          if (session) {
+            if (hitTestSourceRequestedRef.current === false) {
+              session.requestReferenceSpace('viewer').then((referenceSpace) => {
+                session.requestHitTestSource({ space: referenceSpace }).then((source) => {
+                  hitTestSourceRef.current = source;
+                });
+              });
+              session.addEventListener('end', () => {
+                hitTestSourceRequestedRef.current = false;
+                hitTestSourceRef.current = null;
+                if (reticle.visible) reticle.visible = false;
+              });
+              hitTestSourceRequestedRef.current = true;
+            }
+
+            if (hitTestSourceRef.current) {
+              const hitTestResults = frame.getHitTestResults(hitTestSourceRef.current);
+              if (hitTestResults.length > 0) {
+                const hit = hitTestResults[0];
+                // Use 'local' reference space or whatever the renderer is using?
+                // Renderer typically uses 'local-floor' or 'local' if user selected AR.
+                // The ARButton sets up reference space type, usually 'local-floor'.
+
+                // We need to get the pose in the reference space used by the scene.
+                // renderer.xr.getReferenceSpace() should return it.
+                const referenceSpace = renderer.xr.getReferenceSpace();
+                if (referenceSpace) {
+                  const pose = hit.getPose(referenceSpace);
+                  if (pose) {
+                    reticle.visible = true;
+                    reticle.matrix.fromArray(pose.transform.matrix);
+                  }
+                }
+              } else {
+                reticle.visible = false;
+              }
+            }
+          }
+        }
+
+
+        // Update bubble position if active (Only in non-XR or if we overlay DOM)
+        // In WebXR 'dom-overlay', DOM elements are screen-space.
         if (bubbleRef.current && vrmRef.current) {
           const headBone = vrmRef.current.humanoid?.getNormalizedBoneNode('head');
           if (headBone) {
             const vector = new THREE.Vector3();
             headBone.getWorldPosition(vector);
-            vector.y += 0.3; // Offset above head
+
+            vector.y += 0.2; // Slightly above eye level
+            vector.x -= 0.35; // Move to the left (world space)
 
             // Project to 2D
             vector.project(camera);
@@ -329,6 +446,8 @@ export default function Scene3D({
             const y = -(vector.y * .5 - .5) * container.clientHeight;
 
             bubbleRef.current.style.transform = `translate(${x}px, ${y}px)`;
+
+            // In WebXR, if tracking is lost or weird, this might jump.
           }
         }
       }
@@ -336,10 +455,9 @@ export default function Scene3D({
         mixer.update(deltaTime);
       }
 
-      controls.update();
+      controls.update(); // OrbitControls inside WebXR might be shaky if not disabled
       renderer.render(scene, camera);
-    };
-    animate();
+    });
 
     // Resize
     const handleResize = () => {
@@ -354,26 +472,26 @@ export default function Scene3D({
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animationId);
+      renderer.setAnimationLoop(null); // Stop loop
       if (animationSwitchTimeout) clearTimeout(animationSwitchTimeout);
       renderer.dispose();
       controls.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
+      if (document.body.contains(arButton)) {
+        document.body.removeChild(arButton);
+      }
     };
   }, []);
 
-  // Handle AR Mode Camera Adjustment
+  // Handle AR Mode Camera Adjustment (Only for non-WebXR mode or initial setup)
   useEffect(() => {
     if (!cameraRef.current) return;
 
     if (isArActive) {
-      // Move camera back to make model look smaller/grounded in Fullscreen
-      // Or move Y up slightly if needed
-      cameraRef.current.position.set(0, 1.1, 5.0); // Further back
+      cameraRef.current.position.set(0, 1.1, 5.0);
     } else {
-      // Reset to portrait close-up
       cameraRef.current.position.set(0, 1.3, 2.5);
     }
   }, [isArActive]);
