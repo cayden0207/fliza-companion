@@ -24,7 +24,13 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
     // Refs to keep track of latest state inside event handlers
     const recognitionRef = useRef<any>(null);
     const transcriptRef = useRef(''); // crucial for onend to see latest text
-    const intentionallyStoppedRef = useRef(false); // Tack if user clicked stop
+    const intentionallyStoppedRef = useRef(false); // Track if user clicked stop
+    const onTranscriptRef = useRef(onTranscript); // Ref for callback to avoid useEffect re-runs
+
+    // Keep callback ref up to date
+    useEffect(() => {
+        onTranscriptRef.current = onTranscript;
+    }, [onTranscript]);
 
     useEffect(() => {
         // Sync ref with state for use in other places if needed, 
@@ -103,7 +109,7 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
             const textToSend = transcriptRef.current;
             if (textToSend && textToSend.trim().length > 0) {
                 console.log('[VoiceInput] Sending transcript:', textToSend);
-                onTranscript(textToSend);
+                onTranscriptRef.current(textToSend); // Use ref to avoid stale closure
             }
 
             setTranscript('');
@@ -119,7 +125,7 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
                 recognitionRef.current.abort();
             }
         };
-    }, [onTranscript]);
+    }, []); // Empty dependency - recognition should only init once
 
     const toggleListening = useCallback(() => {
         console.log('[VoiceInput] Toggle clicked, current isListening:', isListening, 'disabled:', disabled);
