@@ -80,33 +80,15 @@ export default function Scene3D({
     renderer.xr.enabled = true; // Enable WebXR
     container.appendChild(renderer.domElement);
 
-    // AR Button
+    // AR Button - Keep it hidden since we have our own AR toggle in FloatingMenu
+    // The ARButton is still needed for WebXR session management but shouldn't be visible
     const arButton = ARButton.createButton(renderer, {
       requiredFeatures: ['hit-test'],
-      optionalFeatures: ['dom-overlay', 'local-floor'], // dom-overlay is optional for better support
+      optionalFeatures: ['dom-overlay', 'local-floor'],
       domOverlay: { root: document.body }
     });
-    // Style the button yourself or hide it if you want to trigger programmatically,
-    // but ARButton handles the session creation logic best.
-    // For now, let's append it to body but styling might be needed.
-    // However, user has their own "AR Switch". We might want to just let this button appear
-    // at the bottom or integration.
-    // Let's hide it and click it programmatically? Or just style it to match.
-    // For "Try WebXR", let's leave it visible but styled.
-    arButton.style.display = 'none'; // We'll trigger it or maybe just leave it hidden for now until we decide UI.
-    // Actually, for "Try", we need a way to enter. 
-    // Let's make it visible at bottom center.
-    arButton.style.display = 'block';
-    arButton.style.position = 'absolute';
-    arButton.style.bottom = '20px';
-    arButton.style.left = '50%';
-    arButton.style.transform = 'translateX(-50%)';
-    arButton.style.zIndex = '1000';
-    arButton.style.padding = '10px 20px';
-    arButton.style.border = '2px solid white';
-    arButton.style.background = 'rgba(0,0,0,0.5)';
-    arButton.style.color = 'white';
-    arButton.textContent = 'START AR (WebXR)';
+    // Hide the button completely - user uses FloatingMenu AR toggle instead
+    arButton.style.display = 'none';
     document.body.appendChild(arButton);
 
 
