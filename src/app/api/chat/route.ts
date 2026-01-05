@@ -1,11 +1,28 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const elizaUrl = process.env.ELIZA_URL || 'https://fliza-agent-production.up.railway.app';
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Create admin client lazily to avoid build-time errors
+let supabaseAdmin: SupabaseClient | null = null;
+
+function getSupabaseAdmin(): SupabaseClient | null {
+    if (!supabaseAdmin) {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+        if (!supabaseUrl || !supabaseServiceKey) {
+            console.error('[Chat API] Missing Supabase configuration:', {
+                hasUrl: !!supabaseUrl,
+                hasServiceKey: !!supabaseServiceKey
+            });
+            return null;
+        }
+
+        supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    }
+    return supabaseAdmin;
+}
 
 // In-memory session cache (for production, use Redis or DB)
 const sessionCache: Map<string, { sessionId: string; expiresAt: Date }> = new Map();
@@ -138,21 +155,39 @@ export async function POST(req: Request) {
         const responseText = elizaData.agentResponse?.text || elizaData.text || elizaData.content || '';
 
         if (responseText && !userId.startsWith('guest-')) {
-            // Save AI response to Supabase for logged-in users
-            const { error } = await supabase.from('messages').insert({
-                user_id: userId,
-                role: 'assistant',
-                content: responseText,
-                metadata: {
-                    thought: elizaData.agentResponse?.thought,
-                    actions: elizaData.agentResponse?.actions,
-                    sessionId: sessionId
-                }
-            });
+            const adminClient = getSupabaseAdmin();
 
-            if (error) {
-                console.error('Supabase Write Error:', error);
+            if (!adminClient) {
+                console.error('[Chat API] Cannot save AI response - Supabase admin client not available');
+            } else {
+                console.log('[Chat API] Attempting to save AI response:', {
+                    userId: userId,
+                    contentLength: responseText.length
+                });
+
+                // Save AI response to Supabase for logged-in users
+                const { data, error } = await adminClient.from('messages').insert({
+                    user_id: userId,
+                    role: 'assistant',
+                    content: responseText,
+                    metadata: {
+                        thought: elizaData.agentResponse?.thought,
+                        actions: elizaData.agentResponse?.actions,
+                        sessionId: sessionId
+                    }
+                }).select();
+
+                if (error) {
+                    console.error('[Chat API] Supabase Write Error:', JSON.stringify(error, null, 2));
+                } else {
+                    console.log('[Chat API] AI response saved successfully:', data);
+                }
             }
+        } else {
+            console.log('[Chat API] Skipping save - guest mode or empty response:', {
+                hasResponse: !!responseText,
+                isGuest: userId.startsWith('guest-')
+            });
         }
 
         return NextResponse.json({

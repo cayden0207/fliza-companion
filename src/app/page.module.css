@@ -42,3 +42,11 @@
     padding: 12px;
   }
 }
+
+/* 3D Scene Layer - positioned above camera background */
+.sceneLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: auto;
+}

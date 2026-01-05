@@ -46,6 +46,11 @@
     text-shadow: 1px 1px 0 #000;
 }
 
+/* Hide header in fullscreen AR mode */
+.container.fullscreen .header {
+    display: none;
+}
+
 .recordingDot {
     width: 10px;
     height: 10px;

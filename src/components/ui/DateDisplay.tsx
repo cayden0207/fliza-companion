@@ -4,12 +4,15 @@ import { useState, useEffect } from 'react';
 import styles from './DateDisplay.module.css';
 
 export default function DateDisplay() {
-    const [date, setDate] = useState(new Date());
+    const [date, setDate] = useState<Date | null>(null);
 
     useEffect(() => {
+        setDate(new Date());
         const timer = setInterval(() => setDate(new Date()), 60000); // 1 min update
         return () => clearInterval(timer);
     }, []);
+
+    if (!date) return null; // Or return a skeleton
 
     const month = date.getMonth() + 1;
     const day = date.getDate();
