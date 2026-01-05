@@ -104,6 +104,7 @@ export default function Home() {
   const handleSendMessage = useCallback(async (content: string, role: 'user' | 'assistant' = 'user', visionCtx?: string, attachedImage?: string) => {
     // Send to chat API first
     const result = await sendMessage(content, role, visionCtx);
+    console.log('[Home] sendMessage returned:', result);
 
     // Check if the API returned a TRIGGER_DESIGN action
     if (result?.action === 'TRIGGER_DESIGN') {

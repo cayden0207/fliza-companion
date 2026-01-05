@@ -142,10 +142,11 @@ export function useChatHistory() {
 
                 const apiData = await res.json();
                 console.log('ElizaOS Response:', apiData);
+                console.log('[useChatHistory] Checking for design action, apiData.action:', apiData.action);
 
                 // Check for design action - return it for caller to handle
                 if (apiData.action === 'TRIGGER_DESIGN') {
-                    console.log('[useChatHistory] Design action detected, returning to caller');
+                    console.log('[useChatHistory] Design action detected, returning to caller:', apiData);
                     setLoading(false);
                     return apiData;
                 }
