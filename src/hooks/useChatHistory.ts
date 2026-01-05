@@ -80,8 +80,8 @@ export function useChatHistory() {
         };
     }, [user]);
 
-    // 4. Send Message Function
-    const sendMessage = async (content: string, role: 'user' | 'assistant' = 'user', visionContext?: string) => {
+    // 4. Send Message Function - Returns API response for design action handling
+    const sendMessage = async (content: string, role: 'user' | 'assistant' = 'user', visionContext?: string): Promise<any> => {
         const effectiveUserId = getEffectiveUserId();
         const isGuest = !user;
 
@@ -142,6 +142,13 @@ export function useChatHistory() {
 
                 const apiData = await res.json();
                 console.log('ElizaOS Response:', apiData);
+
+                // Check for design action - return it for caller to handle
+                if (apiData.action === 'TRIGGER_DESIGN') {
+                    console.log('[useChatHistory] Design action detected, returning to caller');
+                    setLoading(false);
+                    return apiData;
+                }
 
                 // For Guest Mode OR if Realtime is slow/fails
                 if (apiData.response) {

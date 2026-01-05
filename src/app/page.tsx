@@ -100,15 +100,17 @@ export default function Home() {
     }
   }, [isCameraActive]);
 
-  // Extended sendMessage that checks for design intent
+  // Extended sendMessage that checks for design intent from API response
   const handleSendMessage = useCallback(async (content: string, role: 'user' | 'assistant' = 'user', visionCtx?: string, attachedImage?: string) => {
     // Send to chat API first
     const result = await sendMessage(content, role, visionCtx);
 
     // Check if the API returned a TRIGGER_DESIGN action
-    // This is handled in useChatHistory now, but we can also check here
-    // For now, we rely on the chat route returning the action
-  }, [sendMessage]);
+    if (result?.action === 'TRIGGER_DESIGN') {
+      console.log('[Home] Triggering design action from API response');
+      handleDesignAction(result.designPrompt || content, result.attachedImage || attachedImage || null);
+    }
+  }, [sendMessage, handleDesignAction]);
 
   // Handle new chat messages for AR bubble
   useEffect(() => {
@@ -217,7 +219,7 @@ export default function Home() {
             </button>
 
             <VoiceInput
-              onTranscript={(text) => sendMessage(text, 'user', visionContext)}
+              onTranscript={(text) => handleSendMessage(text, 'user', visionContext)}
             />
 
             {!user && <span style={{
