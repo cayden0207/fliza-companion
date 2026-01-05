@@ -31,12 +31,23 @@ const sessionCache: Map<string, { sessionId: string; expiresAt: Date }> = new Ma
 const DESIGN_KEYWORDS = ['design', 'create', 'generate', 'make', 'draw', 'artwork', 'poster', 'image', 'picture', 'sketch'];
 const CONTEXT_KEYWORDS = ['this', 'see', 'camera', 'looking', 'photo', 'here', 'showing'];
 
-function detectDesignIntent(message: string): { isDesignRequest: boolean; prompt: string } {
+function detectDesignIntent(message: string, hasVisionContext: boolean = false): { isDesignRequest: boolean; prompt: string } {
     const lower = message.toLowerCase();
     const hasDesignKeyword = DESIGN_KEYWORDS.some(kw => lower.includes(kw));
     const hasContextKeyword = CONTEXT_KEYWORDS.some(kw => lower.includes(kw));
 
-    if (hasDesignKeyword && hasContextKeyword) {
+    console.log('[detectDesignIntent]', {
+        message,
+        hasDesignKeyword,
+        hasContextKeyword,
+        hasVisionContext
+    });
+
+    // Trigger design if:
+    // 1. Has design keyword AND context keyword (e.g., "design this")
+    // 2. OR has design keyword AND camera/vision context is active
+    if (hasDesignKeyword && (hasContextKeyword || hasVisionContext)) {
+        console.log('[detectDesignIntent] Design request detected!');
         return { isDesignRequest: true, prompt: message };
     }
     return { isDesignRequest: false, prompt: '' };
@@ -92,8 +103,8 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
         }
 
-        // Check for design intent
-        const designIntent = detectDesignIntent(message);
+        // Check for design intent (pass visionContext to trigger when camera is active)
+        const designIntent = detectDesignIntent(message, !!visionContext);
         if (designIntent.isDesignRequest) {
             console.log('Design intent detected:', message);
             return NextResponse.json({
