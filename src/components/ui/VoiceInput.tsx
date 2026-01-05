@@ -52,7 +52,8 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
         const recognition = new SpeechRecognition();
         recognition.continuous = true; // Attempt to keep open
         recognition.interimResults = true;
-        recognition.lang = 'en-US';
+        // Use browser's language setting for multi-language support (English, Chinese, etc.)
+        recognition.lang = navigator.language || 'en-US';
 
         recognition.onstart = () => {
             console.log('[VoiceInput] Recognition started');
